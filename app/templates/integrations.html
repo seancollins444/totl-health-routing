@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h4 class="mb-0">TPA Data Integrations</h4>
+                <p class="text-muted mb-0">Manage TPA data feeds for eligibility, accumulators, claims, and referrals.
+                </p>
+            </div>
+            <div class="card-body">
+                {% if message %}
+                <div class="alert alert-success">
+                    {{ message }}
+                </div>
+                {% endif %}
+
+                {% if error %}
+                <div class="alert alert-danger">
+                    {{ error }}
+                </div>
+                {% endif %}
+
+                <!-- Eligibility Feed -->
+                <div class="mb-4">
+                    <h5>📋 Eligibility Feed</h5>
+                    <p class="text-muted">Upload member eligibility data (834-like format)</p>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <form action="/admin/integrations/upload/eligibility" method="post"
+                                enctype="multipart/form-data">
+                                <div class="input-group">
+                                    <input type="file" name="file" class="form-control" accept=".csv,.json" required>
+                                    <button type="submit" class="btn btn-primary">Upload</button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-md-4">
+                            <a href="/admin/integrations/sample/eligibility" class="btn btn-outline-secondary w-100">
+                                Download Sample CSV
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Accumulator Feed -->
+                <div class="mb-4">
+                    <h5>💰 Accumulator Feed</h5>
+                    <p class="text-muted">Upload deductible and OOP accumulator data</p>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <form action="/admin/integrations/upload/accumulators" method="post"
+                                enctype="multipart/form-data">
+                                <div class="input-group">
+                                    <input type="file" name="file" class="form-control" accept=".csv,.json" required>
+                                    <button type="submit" class="btn btn-primary">Upload</button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-md-4">
+                            <a href="/admin/integrations/sample/accumulators" class="btn btn-outline-secondary w-100">
+                                Download Sample CSV
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Claims Feed -->
+                <div class="mb-4">
+                    <h5>🏥 Claims Feed</h5>
+                    <p class="text-muted">Upload historical claims data for risk segmentation</p>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <form action="/admin/integrations/upload/claims" method="post"
+                                enctype="multipart/form-data">
+                                <div class="input-group">
+                                    <input type="file" name="file" class="form-control" accept=".csv,.json" required>
+                                    <button type="submit" class="btn btn-primary">Upload</button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-md-4">
+                            <a href="/admin/integrations/sample/claims" class="btn btn-outline-secondary w-100">
+                                Download Sample CSV
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Referral Feed -->
+                <div class="mb-4">
+                    <h5>🔔 Referral Feed</h5>
+                    <p class="text-muted">Upload referral/ordering events to trigger routing logic</p>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <form action="/admin/integrations/upload/referrals" method="post"
+                                enctype="multipart/form-data">
+                                <div class="input-group">
+                                    <input type="file" name="file" class="form-control" accept=".csv,.json" required>
+                                    <button type="submit" class="btn btn-primary">Upload</button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-md-4">
+                            <a href="/admin/integrations/sample/referrals" class="btn btn-outline-secondary w-100">
+                                Download Sample CSV
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+
+                <hr class="my-4">
+
+                <!-- TPA Exception List Export -->
+                <div class="mb-4">
+                    <h5>📤 TPA Exception List Export</h5>
+                    <p class="text-muted">Export pre-approved CPT-NPI combinations for TPA micro-exceptions (benefit
+                        overrides)</p>
+
+                    <div class="d-flex gap-2 align-items-center">
+                        <a href="/admin/exceptions/export" class="btn btn-success" download>
+                            Export Exception List CSV
+                        </a>
+                        <small class="text-muted">Submit this file to TPAs to enable $0 cost-share at approved
+                            facilities</small>
+                    </div>
+
+                    <div class="alert alert-info mt-3" style="font-size: 13px;">
+                        <strong>What's included:</strong> CPT bundles, facility NPIs, calculated savings (avg & p10),
+                        episode counts.
+                        This tells the TPA which CPT-NPI combinations are safe to make $0 OOP.
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <!-- API / Webhook Setup -->
+                <div class="mb-4">
+                    <h5>🔗 TPA API Integration Setup</h5>
+                    <p class="text-muted">To integrate with a new TPA, request their API credentials and configure
+                        below:</p>
+
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="fw-bold">What We Need from the TPA</h6>
+
+                            <table class="table table-sm table-bordered bg-white mb-3">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>API Base URL</strong></td>
+                                        <td>The TPA's API endpoint (e.g., <code>https://api.tpaname.com/v1</code>)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>API Key/Token</strong></td>
+                                        <td>Authentication credentials to access their API</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Data Feed Endpoints</strong></td>
+                                        <td>Specific paths for eligibility, claims, accumulators, referrals</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Webhook URL (Optional)</strong></td>
+                                        <td>If TPA pushes data to us, provide our webhook URL</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <div class="alert alert-info mb-3">
+                                <strong>Integration Methods:</strong>
+                                <ul class="mb-0">
+                                    <li><strong>Pull (API):</strong> We periodically fetch data from TPA's API</li>
+                                    <li><strong>Push (Webhook):</strong> TPA sends data to our endpoints in real-time
+                                    </li>
+                                    <li><strong>File Transfer (SFTP/S3):</strong> TPA uploads files to shared location
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div class="mt-3">
+                                <p class="mb-2 small"><strong>Our Webhook Endpoints (if TPA pushes to us):</strong></p>
+                                <p class="mb-1 small"><code>POST https://your-domain.com/tpa/ingest/eligibility</code>
+                                </p>
+                                <p class="mb-1 small"><code>POST https://your-domain.com/tpa/ingest/accumulators</code>
+                                </p>
+                                <p class="mb-1 small"><code>POST https://your-domain.com/tpa/ingest/claims</code></p>
+                                <p class="mb-1 small"><code>POST https://your-domain.com/tpa/ingest/referrals</code></p>
+                            </div>
+
+                            <div class="mt-3">
+                                <p class="mb-2 small"><strong>Authentication:</strong></p>
+                                <p class="text-muted small mb-0">TPAs should include header:
+                                    <code>X-API-Key: [provided-by-admin]</code>
+                                </p>
+                                <p class="text-muted small">Contact your system administrator to generate an API key for
+                                    the TPA.</p>
+                            </div>
+
+                            <div class="mt-4">
+                                <p class="mb-2 small"><strong>Example Request from TPA to Totl:</strong></p>
+                                <pre class="bg-dark text-light p-2 small" style="border-radius: 4px;"><code>POST /tpa/ingest/referrals
+Content-Type: application/json
+X-API-Key: totl-provided-api-key
+
+[
+  {
+    "member_id": "MEM001",
+    "cpt_code": "80050",
+    "provider_npi": "9999999999"
+  }
+]</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">Upload Successful</div>
+            <div class="card-body">
+                <h5 class="card-title">Added {{ count }} new members</h5>
+                <p class="card-text">
+                    You have successfully uploaded eligibility data for <strong>{{ plan_name }}</strong>.
+                </p>
+                <p>
+                    Would you like to send the onboarding SMS to these new members now?
+                </p>
+                <div class="alert alert-info">
+                    <strong>Message Preview:</strong><br>
+                    "Hi, this is Totl, working with your employer’s health plan. We help you get many labs and imaging
+                    tests at $0. When your doctor gives you an order, text us a photo and we’ll show you the nearest $0
+                    options. Reply YES to enroll or NO to opt out."
+                </div>
+
+                <form action="/admin/trigger_onboarding" method="post">
+                    <input type="hidden" name="plan_id" value="{{ plan_id }}">
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Yes, Send Onboarding SMS</button>
+                        <a href="/admin/dashboard" class="btn btn-outline-secondary">No, Return to Dashboard</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

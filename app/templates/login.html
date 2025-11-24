@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="login-container" style="margin-top: -100px;"> <!-- Offset navbar margin -->
+    <div class="card login-card">
+        <div class="text-center mb-4">
+            <img src="/static/images/logo.png" alt="Totl" height="60" class="mb-3">
+            <h4 class="fw-bold">Welcome Back</h4>
+            <p class="text-secondary">Sign in to manage Totl</p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        <form method="post">
+            <div class="mb-3">
+                <label class="form-label text-secondary small fw-bold">USERNAME</label>
+                <input type="text" name="username" class="form-control" required placeholder="Enter username">
+            </div>
+            <div class="mb-4">
+                <label class="form-label text-secondary small fw-bold">PASSWORD</label>
+                <input type="password" name="password" class="form-control" required placeholder="Enter password">
+            </div>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">Sign In</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

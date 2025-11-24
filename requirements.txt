@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+sqlmodel
+alembic
+psycopg2-binary
+python-multipart
+jinja2
+python-jose[cryptography]
+passlib[bcrypt]
+twilio
+google-generativeai
+python-dotenv
+requests
+pydantic-settings
+pytest
+httpx
+itsdangerous

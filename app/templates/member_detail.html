@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">{{ member.first_name }} {{ member.last_name }}</h1>
+            <span
+                class="badge {% if member.opted_out %}bg-danger{% elif member.opted_in %}bg-success{% else %}bg-secondary{% endif %}">
+                {% if member.opted_out %}Opted Out{% elif member.opted_in %}Active{% else %}Pending{% endif %}
+            </span>
+            <span
+                class="badge {% if member.risk_tier == 'High' %}bg-danger{% elif member.risk_tier == 'Medium' %}bg-warning text-dark{% else %}bg-info{% endif %} ms-2">
+                Risk: {{ member.risk_tier }}
+            </span>
+        </div>
+        <a href="/admin/members" class="btn btn-outline-secondary">Back to List</a>
+    </div>
+
+    {% if accumulator %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Financial Status (YTD)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Deductible: ${{ accumulator.deductible_met }} / ${{
+                                accumulator.deductible_limit }}</label>
+                            <div class="progress mb-3">
+                                <div class="progress-bar bg-primary" role="progressbar"
+                                    style="width: {{ (accumulator.deductible_met / accumulator.deductible_limit) * 100 }}%">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Out-of-Pocket: ${{ accumulator.oop_met }} / ${{
+                                accumulator.oop_limit }}</label>
+                            <div class="progress mb-3">
+                                <div class="progress-bar bg-success" role="progressbar"
+                                    style="width: {{ (accumulator.oop_met / accumulator.oop_limit) * 100 }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Edit Member Info -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Member Details</h5>
+                </div>
+                <div class="card-body">
+                    <form action="/admin/members/{{ member.id }}" method="post">
+                        <div class="mb-3">
+                            <label class="form-label">First Name</label>
+                            <input type="text" class="form-control" name="first_name" value="{{ member.first_name }}"
+                                required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Last Name</label>
+                            <input type="text" class="form-control" name="last_name" value="{{ member.last_name }}"
+                                required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Phone Number</label>
+                            <input type="text" class="form-control" name="phone_number"
+                                value="{{ member.phone_number }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Date of Birth</label>
+                            <input type="date" class="form-control" name="date_of_birth"
+                                value="{{ member.date_of_birth }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Plan</label>
+                            <select class="form-select" name="plan_id">
+                                {% for plan in plans %}
+                                <option value="{{ plan.id }}" {% if plan.id==member.plan_id %}selected{% endif %}>{{
+                                    plan.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Save Changes</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat History -->
+        <div class="col-md-8 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Conversation History</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="chat-history p-3" style="height: 500px; overflow-y: auto; background-color: #f8f9fa;">
+                        {% if interactions %}
+                        {% for msg in interactions %}
+                        <div
+                            class="d-flex mb-3 {% if 'inbound' in msg.message_type %}justify-content-start{% else %}justify-content-end{% endif %}">
+                            <div class="card {% if 'inbound' in msg.message_type %}bg-white text-dark{% else %}bg-primary text-white{% endif %}"
+                                style="max-width: 75%;">
+                                <div class="card-body p-2">
+                                    {% if msg.content %}
+                                    <p class="mb-1">{{ msg.content }}</p>
+                                    {% elif msg.inbound_content_summary %}
+                                    <p class="mb-1"><em>{{ msg.inbound_content_summary }}</em></p>
+                                    {% endif %}
+
+                                    {% if msg.message_type == 'inbound_media' %}
+                                    <div class="mt-2">
+                                        <span class="badge bg-secondary">Image Received</span>
+                                    </div>
+                                    {% endif %}
+
+                                    <small
+                                        class="{% if 'inbound' in msg.message_type %}text-muted{% else %}text-white-50{% endif %}"
+                                        style="font-size: 0.7rem;">
+                                        {{ msg.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <p class="text-center text-muted my-5">No conversation history yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

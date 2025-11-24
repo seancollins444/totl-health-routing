@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-4 d-flex justify-content-between align-items-center">
+    <div>
+        <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 4px;">Members</h2>
+        <p style="color: var(--gray-600); font-size: 14px; margin: 0;">{{ members|length }} total</p>
+    </div>
+    <div>
+        <select class="form-select" style="width: 200px;"
+            onchange="window.location.href='/admin/members?employer_id=' + this.value">
+            <option value="">All Employers</option>
+            {% for emp in employers %}
+            <option value="{{ emp.id }}" {% if selected_employer_id==emp.id %}selected{% endif %}>{{ emp.name }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<div class="row mb-4 align-items-center">
+    <div class="col-md-6">
+        <p class="text-secondary">Manage and view all eligible members.</p>
+    </div>
+    <div class="col-md-6 text-end">
+        <form action="/admin/members" method="get" class="d-flex gap-2">
+            <input type="text" name="q" class="form-control" placeholder="Search name or phone..."
+                value="{{ query or '' }}">
+            <select name="status" class="form-select w-auto">
+                <option value="all" {% if status=='all' %}selected{% endif %}>All Status</option>
+                <option value="opted_in" {% if status=='opted_in' %}selected{% endif %}>Opted In</option>
+                <option value="opted_out" {% if status=='opted_out' %}selected{% endif %}>Opted Out</option>
+                <option value="pending" {% if status=='pending' %}selected{% endif %}>Pending</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Member ID</th>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Plan</th>
+                        <th>Status</th>
+                        <th>Savings</th>
+                        <th>Joined</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in members %}
+                    <tr>
+                        <td class="fw-medium">{{ m.member_id }}</td>
+                        <td><a href="/admin/members/{{ m.id }}" class="text-decoration-none fw-bold">{{ m.first_name }}
+                                {{ m.last_name }}</a></td>
+                        <td>{{ m.phone_number }}</td>
+                        <td>
+                            {% if m.plan %}
+                            {{ m.plan.name }}
+                            {% else %}
+                            <span class="text-muted">Unknown</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if m.opted_out %}
+                            <span class="badge bg-danger">Opted Out</span>
+                            {% elif m.opted_in %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="text-success fw-semibold">${{ "%.0f"|format(m.total_savings) }}</span>
+                        </td>
+                        <td class="text-secondary small">
+                            {% if m.opted_in_date %}
+                            {{ m.opted_in_date.strftime('%Y-%m-%d') }}</td>
+                        {% else %}
+                        -
+                        {% endif %}
+                        </td>
+                        <td>
+                            <a href="/admin/members/{{ m.id }}" class="btn btn-sm btn-outline-primary">View</a>
+                            {% if m.opted_out %}
+                            <form action="/admin/members/{{ m.id }}/unlock" method="post" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-outline-success">Unlock</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-secondary">
+                            No members found matching your criteria.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

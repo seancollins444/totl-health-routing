@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">Campaign Sent</div>
+            <div class="card-body">
+                <h5 class="card-title">Successfully processed campaign</h5>
+                <p class="card-text">
+                    <strong>{{ sent_count }}</strong> messages were sent successfully.
+                </p>
+
+                {% if errors %}
+                <div class="alert alert-warning">
+                    <h6>Errors:</h6>
+                    <ul>
+                        {% for error in errors %}
+                        <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <div class="d-grid gap-2">
+                    <a href="/admin/dashboard" class="btn btn-primary">Return to Dashboard</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

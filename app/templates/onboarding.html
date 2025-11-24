@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Trigger Onboarding Campaign</div>
+            <div class="card-body">
+                <p>Select a plan to send onboarding SMS to all eligible members who have not yet opted in or out.</p>
+                <form action="/admin/campaign/preview" method="post">
+                    <div class="mb-3">
+                        <label class="form-label">Select Plan</label>
+                        <select name="plan_id" class="form-select" required>
+                            {% for plan in plans %}
+                            <option value="{{ plan.id }}">{{ plan.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Preview Campaign</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

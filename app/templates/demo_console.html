@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row h-100">
+    <!-- Left: Controls -->
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header">Demo Controls</div>
+            <div class="card-body">
+                <form action="/admin/demo/console" method="get" class="mb-4">
+                    <label class="form-label fw-bold">Select User</label>
+                    <select name="member_id" class="form-select" onchange="this.form.submit()">
+                        <option value="">-- Choose Persona --</option>
+                        {% for user in demo_users %}
+                        <option value="{{ user.id }}" {% if selected_member and selected_member.id==user.id %}selected{%
+                            endif %}>
+                            {{ user.first_name }} {{ user.last_name }}
+                            {% if user.first_name == 'Jane' %}(Simulated Only){% else %}(Hybrid: SMS + Web){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </form>
+
+                {% if selected_member %}
+                <hr>
+                <h6 class="fw-bold">1. Trigger TPA Referral</h6>
+                <form action="/admin/demo/trigger" method="post" class="mb-4">
+                    <input type="hidden" name="member_id" value="{{ selected_member.member_id }}">
+                    <div class="mb-2">
+                        <select name="cpt_code" class="form-select form-select-sm">
+                            <option value="73721">MRI Knee (Non-Viable / $450)</option>
+                            <option value="80050">Blood Work (Viable / $30)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Trigger Referral Event</button>
+                    <div class="form-text small mt-1">Simulates TPA sending us a referral file.</div>
+                </form>
+
+                <hr>
+                <h6 class="fw-bold">2. Simulate Member Action</h6>
+                <form action="/admin/demo/simulate_inbound" method="post" class="mb-3">
+                    <input type="hidden" name="member_id" value="{{ selected_member.id }}">
+                    <input type="hidden" name="action" value="text">
+                    <div class="input-group mb-2">
+                        <input type="text" name="body" class="form-control form-control-sm"
+                            placeholder="Type message (e.g. YES, HELP)...">
+                        <button class="btn btn-outline-secondary btn-sm" type="submit">Send Text</button>
+                    </div>
+                </form>
+
+                <form action="/admin/demo/simulate_inbound" method="post">
+                    <input type="hidden" name="member_id" value="{{ selected_member.id }}">
+                    <input type="hidden" name="action" value="pic">
+                    <button type="submit" class="btn btn-outline-success btn-sm w-100">
+                        <i class="bi bi-image"></i> Simulate Sending Referral Photo
+                    </button>
+                </form>
+                {% else %}
+                <div class="alert alert-info">Select a user to start the demo.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Phone Simulator -->
+    <div class="col-md-8">
+        <div class="card h-100 bg-light">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>
+                    {% if selected_member %}
+                    {{ selected_member.first_name }}'s Phone
+                    <span class="badge bg-secondary ms-2">{{ selected_member.phone_number }}</span>
+                    {% else %}
+                    Phone Simulator
+                    {% endif %}
+                </span>
+                <div class="d-flex gap-2">
+                    {% if selected_member %}
+                    <form action="/admin/demo/reset" method="post" style="display: inline;">
+                        <input type="hidden" name="member_id" value="{{ selected_member.id }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                            onclick="return confirm('Clear all messages for {{ selected_member.first_name }}?')">
+                            <i class="bi bi-trash"></i> Reset
+                        </button>
+                    </form>
+                    {% endif %}
+                    <button class="btn btn-sm btn-link text-decoration-none" onclick="location.reload()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="card-body p-0 d-flex justify-content-center align-items-center"
+                style="background: #f0f2f5; min-height: 500px;">
+
+                {% if selected_member %}
+                <!-- Phone Frame -->
+                <div
+                    style="width: 375px; height: 667px; background: white; border-radius: 40px; border: 12px solid #333; overflow: hidden; position: relative; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
+                    <!-- Notch -->
+                    <div
+                        style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 150px; height: 25px; background: #333; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; z-index: 10;">
+                    </div>
+
+                    <!-- Header -->
+                    <div
+                        style="background: #f8f9fa; padding: 35px 15px 10px; border-bottom: 1px solid #eee; text-align: center;">
+                        <div class="fw-bold">Totl Health</div>
+                        <div class="small text-muted">Text Message</div>
+                    </div>
+
+                    <!-- Messages Area -->
+                    <div
+                        style="height: 540px; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; background: white;">
+                        {% for msg in interactions %}
+                        {% if "outbound" in msg.message_type %}
+                        <!-- System Message (Left) -->
+                        <div class="align-self-start" style="max-width: 80%;">
+                            <div
+                                style="background: #e9ecef; color: #333; padding: 10px 14px; border-radius: 18px; border-bottom-left-radius: 4px; font-size: 14px;">
+                                {{ msg.content.split('[Image:')[0] }}
+                                {% if '[Image:' in msg.content %}
+                                {% set img_url = msg.content.split('[Image: ')[1].split(']')[0] %}
+                                <div class="mt-2">
+                                    <img src="{{ img_url }}" alt="Referral"
+                                        style="max-width: 100%; border-radius: 8px;">
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="text-muted" style="font-size: 10px; margin-top: 2px; margin-left: 4px;">Totl •
+                                {{ msg.timestamp.strftime('%H:%M') }}</div>
+                        </div>
+                        {% elif "inbound" in msg.message_type %}
+                        <!-- User Message (Right) -->
+                        <div class="align-self-end" style="max-width: 80%;">
+                            <div
+                                style="background: #007AFF; color: white; padding: 10px 14px; border-radius: 18px; border-bottom-right-radius: 4px; font-size: 14px;">
+                                {{ msg.content }}
+                            </div>
+                            <div class="text-muted text-end"
+                                style="font-size: 10px; margin-top: 2px; margin-right: 4px;">You • {{
+                                msg.timestamp.strftime('%H:%M') }}</div>
+                        </div>
+                        {% elif "suppressed" in msg.message_type %}
+                        <!-- Debug Info (Center) -->
+                        <div class="align-self-center my-2">
+                            <span class="badge bg-light text-dark border">Debug: {{ msg.content }}</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if not interactions %}
+                        <div class="text-center text-muted mt-5">
+                            <p>No messages yet.</p>
+                            <p class="small">Trigger a referral to start.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Input Area (Visual Only) -->
+                    <div
+                        style="position: absolute; bottom: 0; width: 100%; padding: 10px; background: #f8f9fa; border-top: 1px solid #eee;">
+                        <div
+                            style="background: white; border: 1px solid #ddd; border-radius: 20px; padding: 8px 12px; color: #aaa; font-size: 14px;">
+                            Text Message
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center text-muted">
+                    <i class="bi bi-phone" style="font-size: 48px;"></i>
+                    <p class="mt-2">Select a persona to view their phone.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
