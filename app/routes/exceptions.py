@@ -44,22 +44,30 @@ async def export_exceptions(
     ])
     
     # Rows
-    for exc in exceptions:
-        plan = session.get(Plan, exc.plan_id)
-        employer = session.get(Employer, plan.employer_id) if plan else None
-        
+    # Rows
+    if not exceptions:
+        # Write sample row if no data
         writer.writerow([
-            employer.id if employer else '',
-            exc.plan_id,
-            exc.cpt_bundle_id,
-            exc.cpt_list,
-            exc.npi,
-            exc.cost_share_type,
-            f"{exc.member_cost_share:.2f}",
-            f"{exc.avg_savings:.2f}",
-            f"{exc.p10_savings:.2f}",
-            exc.episode_count
+            'GRP12345', '1', 'BUN001', '73721,73722', '1234567890', 
+            'copay', '50.00', '200.00', '150.00', '10'
         ])
+    else:
+        for exc in exceptions:
+            plan = session.get(Plan, exc.plan_id)
+            employer = session.get(Employer, plan.employer_id) if plan else None
+            
+            writer.writerow([
+                employer.id if employer else '',
+                exc.plan_id,
+                exc.cpt_bundle_id,
+                exc.cpt_list,
+                exc.npi,
+                exc.cost_share_type,
+                f"{exc.member_cost_share:.2f}",
+                f"{exc.avg_savings:.2f}",
+                f"{exc.p10_savings:.2f}",
+                exc.episode_count
+            ])
     
     output.seek(0)
     

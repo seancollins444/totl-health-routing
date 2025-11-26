@@ -10,10 +10,37 @@ from typing import Optional
 import csv
 import codecs
 from datetime import datetime
+from app.core.utils import normalize_phone_number
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 settings = get_settings()
+
+# --- Template Filters ---
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo # Fallback
+
+def to_cst(value):
+    if not value:
+        return ""
+    if isinstance(value, str):
+        # Try to parse if string? Or assume datetime
+        return value
+    if value.tzinfo is None:
+        # Assume UTC if naive
+        from datetime import timezone
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(ZoneInfo("America/Chicago"))
+
+def format_datetime(value, fmt="%Y-%m-%d %H:%M:%S"):
+    if value is None:
+        return ""
+    return value.strftime(fmt)
+
+templates.env.filters["to_cst"] = to_cst
+templates.env.filters["strftime"] = format_datetime
 
 # --- Auth Helpers (Simplified for MVP) ---
 # In a real app, use python-jose and proper cookies. 
@@ -129,7 +156,7 @@ async def upload_eligibility(request: Request, file: UploadFile = File(...), ses
                     first_name=row["first_name"],
                     last_name=row["last_name"],
                     date_of_birth=datetime.strptime(row["date_of_birth"], "%Y-%m-%d").date(),
-                    phone_number=row["phone_number"],
+                    phone_number=normalize_phone_number(row["phone_number"]),
                     plan_id=int(row["plan_id"])
                 )
                 session.add(new_member)
@@ -314,7 +341,7 @@ async def trigger_onboarding(
     errors = []
     for m in members:
         msg = "Hi, this is Totl, working with your employer’s health plan. We help you get many labs and imaging tests at $0. When your doctor gives you an order, text us a photo and we’ll show you the nearest $0 options. Reply YES to enroll or NO to opt out."
-        sid = twilio.send_sms(m.phone_number, msg)
+        sid = twilio.send_sms(m.phone_number, msg, session=session)
         if sid:
             sent_count += 1
             # Log interaction
@@ -380,7 +407,8 @@ async def update_member(
         
     member.first_name = first_name
     member.last_name = last_name
-    member.phone_number = phone_number
+    from app.core.utils import normalize_phone_number
+    member.phone_number = normalize_phone_number(phone_number)
     member.date_of_birth = datetime.strptime(date_of_birth, "%Y-%m-%d").date()
     member.plan_id = plan_id
     
@@ -395,6 +423,37 @@ async def update_member(
 async def settings_page(request: Request, session: Session = Depends(get_session)):
     login_required(request)
     return templates.TemplateResponse("settings.html", {"request": request})
+
+
+@router.post("/demo/trigger_event")
+async def trigger_demo_event(
+    request: Request,
+    member_id: str = Form(...),
+    cpt_code: str = Form(...),
+    session: Session = Depends(get_session)
+):
+    login_required(request)
+    from app.services.tpa_ingestion import TPAIngestionService
+    from app.db.models import Eligibility
+    
+    # Find the member by member_id string (e.g., "MEM001")
+    member = session.exec(select(Eligibility).where(Eligibility.member_id == member_id)).first()
+    
+    if not member:
+        return RedirectResponse(url=f"/admin/demo/console", status_code=303)
+    
+    # Simulate TPA Referral
+    service = TPAIngestionService(session)
+    
+    # Ingest referral
+    result = service.ingest_referrals([{
+        "member_id": member_id,
+        "cpt_code": cpt_code,
+        "provider_npi": "1111111111"  # General Hospital (High Cost)
+    }])
+    
+    # Redirect back to demo console with the member selected
+    return RedirectResponse(url=f"/admin/demo/console?member_id={member.id}", status_code=303)
 
 @router.get("/demo/console", response_class=HTMLResponse)
 async def demo_console(request: Request, member_id: int = None, session: Session = Depends(get_session)):
@@ -442,6 +501,7 @@ async def simulate_inbound(
     twilio = TwilioService()
     
     # Call the webhook logic directly instead of making HTTP requests
+        
     if action == 'text':
         # Import the webhook function
         from app.routes.twilio import twilio_webhook
@@ -455,13 +515,15 @@ async def simulate_inbound(
                 NumMedia=0,
                 session=session
             )
+            print(f"DEBUG ADMIN: Webhook returned: {response}", flush=True)
             
             # Log the simulated interaction (inbound)
-            session.add(MemberInteraction(
-                member_id=member.id,
-                message_type="inbound_text",
-                content=body if body else ""
-            ))
+            # REMOVED: Webhook already logs this
+            # session.add(MemberInteraction(
+            #     member_id=member.id,
+            #     message_type="inbound_text",
+            #     content=body if body else ""
+            # ))
             
             # Parse response and log outbound interaction
             # The webhook returns TwiML, we'll extract the message
@@ -470,6 +532,7 @@ async def simulate_inbound(
                 match = re.search(r'<Message>(.*?)</Message>', str(response), re.DOTALL)
                 if match:
                     outbound_msg = match.group(1).strip()
+                    # RESTORED: Webhook returns TwiML but does NOT log the response. We must log it here for simulation.
                     session.add(MemberInteraction(
                         member_id=member.id,
                         message_type="outbound_sms",
@@ -477,32 +540,49 @@ async def simulate_inbound(
                     ))
             
             session.commit()
+            print("DEBUG ADMIN: Session committed", flush=True)
         except Exception as e:
-            print(f"Simulation failed: {e}")
+            print(f"DEBUG ADMIN: Simulation failed: {e}", flush=True)
             import traceback
             traceback.print_exc()
             
     elif action == 'pic':
         from app.routes.twilio import twilio_webhook
-        from starlette.datastructures import FormData
+        from app.services.referral_image_service import ReferralImageService
         
-        # For picture simulation, we need to provide media URL
-        # We'll just log it and create a fake interaction
+        # Generate a realistic LabCorp referral image
+        referral_service = ReferralImageService()
+        try:
+            image_url = referral_service.generate_general_hospital_referral(
+                member_name=f"{member.first_name} {member.last_name}",
+                provider_name="Dr. Jane Doe",
+                test_name="MRI Knee"
+            )
+            full_url = f"http://localhost:8000{image_url}"
+        except Exception as e:
+            print(f"Failed to generate LabCorp referral: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback to a simple placeholder
+            full_url = "http://localhost:8000/static/placeholder.png"
+        
+        # Call the webhook with the generated image
         try:
             response = await twilio_webhook(
                 request=request,
                 From=member.phone_number,
                 Body="",
                 NumMedia=1,
+                MediaUrl0=full_url,
                 session=session
             )
             
-            # Log interactions
-            session.add(MemberInteraction(
-                member_id=member.id,
-                message_type="inbound_media",
-                content="[Simulated referral photo]"
-            ))
+            # Log interactions - REMOVED to prevent double logging (webhook handles it)
+            # session.add(MemberInteraction(
+            #     member_id=member.id,
+            #     message_type="inbound_media",
+            #     content=f"[Simulated LabCorp referral photo]"
+            # ))
             
             # Parse response
             if response and "<Message>" in str(response):
@@ -532,17 +612,67 @@ async def reset_demo(
     session: Session = Depends(get_session)
 ):
     login_required(request)
-    from app.db.models import MemberInteraction
+    from app.db.models import MemberInteraction, ReferralEvent, SupportMessage, Eligibility, OptOut
+    from sqlmodel import delete, select, func
     
-    # Delete all interactions for this member
-    interactions = session.exec(
-        select(MemberInteraction).where(MemberInteraction.member_id == member_id)
-    ).all()
+    print(f"DEBUG RESET: Hard Resetting member {member_id}", flush=True)
     
-    for interaction in interactions:
-        session.delete(interaction)
-    
-    session.commit()
+    try:
+        # Count before
+        count_interactions = session.exec(select(func.count()).select_from(MemberInteraction).where(MemberInteraction.member_id == member_id)).one()
+        print(f"DEBUG RESET: Interactions before: {count_interactions}", flush=True)
+        
+        # 1. Delete interactions
+        session.exec(delete(MemberInteraction).where(MemberInteraction.member_id == member_id))
+        session.flush()
+        
+        # Verify interactions deleted
+        count_after = session.exec(select(func.count()).select_from(MemberInteraction).where(MemberInteraction.member_id == member_id)).one()
+        print(f"DEBUG RESET: Interactions after: {count_after}", flush=True)
+        
+        # 2. Delete referrals
+        session.exec(delete(ReferralEvent).where(ReferralEvent.member_id == member_id))
+        session.flush()
+        
+        # 3. Delete support messages
+        session.exec(delete(SupportMessage).where(SupportMessage.member_id == member_id))
+        session.flush()
+        
+        # 4. Reset Member Status
+        member = session.get(Eligibility, member_id)
+        if member:
+            print(f"DEBUG RESET: Resetting eligibility for {member.first_name}", flush=True)
+            if member.id in [1, 2]: # Sean, Jane
+                member.opted_in = True
+                member.opted_out = False
+                # Ensure phone is normalized
+                from app.core.utils import normalize_phone_number
+                member.phone_number = normalize_phone_number(member.phone_number)
+            else: # Bob
+                member.opted_in = False
+                member.opted_out = True
+            session.add(member)
+            
+            # 5. Delete OptOut record
+            from app.core.utils import normalize_phone_number
+            normalized_number = normalize_phone_number(member.phone_number)
+            session.exec(delete(OptOut).where(OptOut.phone_number == normalized_number))
+            # Also try deleting raw just in case
+            if normalized_number != member.phone_number:
+                 session.exec(delete(OptOut).where(OptOut.phone_number == member.phone_number))
+        
+        session.commit()
+        session.expire_all() # Force reload of all objects
+        print(f"DEBUG RESET: Commit successful", flush=True)
+        
+    except Exception as e:
+        print(f"DEBUG RESET: Error during reset: {e}", flush=True)
+        session.rollback()
+        import traceback
+        traceback.print_exc()
+        
+    import time
+    return RedirectResponse(url=f"/admin/demo/console?member_id={member_id}&t={int(time.time())}", status_code=303)
     
     return RedirectResponse(url=f"/admin/demo/console?member_id={member_id}", status_code=303)
 
@@ -742,20 +872,25 @@ MEM002,73721,9999999999
 
 # --- Support Queue ---
 @router.get("/support", response_class=HTMLResponse)
-async def support_queue(request: Request, session: Session = Depends(get_session)):
+async def support_queue(request: Request, filter: str = "active", session: Session = Depends(get_session)):
     login_required(request)
     from app.db.models import SupportMessage
     
-    # Get all pending and replied messages
+    query = select(SupportMessage)
+    
+    if filter == "resolved":
+        query = query.where(SupportMessage.status == "resolved")
+    else:
+        query = query.where(SupportMessage.status.in_(["pending", "replied"]))
+        
     messages = session.exec(
-        select(SupportMessage)
-        .where(SupportMessage.status.in_(["pending", "replied"]))
-        .order_by(SupportMessage.timestamp.desc())
+        query.order_by(SupportMessage.timestamp.desc())
     ).all()
     
     return templates.TemplateResponse("support.html", {
         "request": request,
-        "messages": messages
+        "messages": messages,
+        "current_filter": filter
     })
 
 @router.post("/support/{message_id}/reply", response_class=HTMLResponse)
@@ -806,3 +941,4 @@ async def support_resolve(
     session.commit()
     
     return RedirectResponse(url="/admin/support", status_code=303)
+print('ADMIN MODULE LOADED', flush=True)

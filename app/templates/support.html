@@ -3,9 +3,17 @@
 {% block content %}
 <div class="container my-4">
     <div class="card shadow-sm">
-        <div class="card-header bg-white">
-            <h4 class="mb-0">Support Queue</h4>
-            <p class="text-muted mb-0">Messages requiring review or response</p>
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <div>
+                <h4 class="mb-0">Support Queue</h4>
+                <p class="text-muted mb-0">Messages requiring review or response</p>
+            </div>
+            <div class="btn-group">
+                <a href="/admin/support?filter=active"
+                    class="btn btn-sm {% if current_filter != 'resolved' %}btn-primary{% else %}btn-outline-primary{% endif %}">Active</a>
+                <a href="/admin/support?filter=resolved"
+                    class="btn btn-sm {% if current_filter == 'resolved' %}btn-primary{% else %}btn-outline-primary{% endif %}">Resolved</a>
+            </div>
         </div>
         <div class="card-body">
             {% if messages %}
@@ -24,7 +32,7 @@
                     {% for msg in messages %}
                     <tr
                         class="{% if msg.status == 'pending' %}table-warning{% elif msg.status == 'replied' %}table-info{% else %}table-success{% endif %}">
-                        <td class="small text-muted">{{ msg.timestamp.strftime('%m/%d %H:%M') }}</td>
+                        <td class="small text-muted">{{ msg.timestamp | to_cst | strftime('%m/%d %H:%M') }}</td>
                         <td>
                             <a href="/admin/members/{{ msg.member_id }}">
                                 {{ msg.member.first_name }} {{ msg.member.last_name }}

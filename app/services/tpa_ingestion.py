@@ -1,6 +1,7 @@
 from sqlmodel import Session, select
 from app.db.models import Eligibility, Accumulator, Claim, ReferralEvent, Plan, Employer, MemberInteraction
 from datetime import datetime, date
+from app.core.utils import normalize_phone_number
 
 class TPAIngestionService:
     def __init__(self, session: Session):
@@ -30,7 +31,7 @@ class TPAIngestionService:
                         first_name=row["first_name"],
                         last_name=row["last_name"],
                         date_of_birth=datetime.strptime(row["date_of_birth"], "%Y-%m-%d").date(),
-                        phone_number=row["phone_number"],
+                        phone_number=normalize_phone_number(row["phone_number"]),
                         plan_id=plan_id,
                         risk_tier=row.get("risk_tier", "Low")
                     )
@@ -166,8 +167,18 @@ class TPAIngestionService:
                 from app.services.pricing_service import PricingService
                 pricing = PricingService(self.session)
                 matches = pricing.find_cheapest_facilities(member.plan_id, [row["cpt_code"]], member_zip=member.zip_code)
+                
+                accumulator = self.session.exec(select(Accumulator).where(Accumulator.member_id == member.id)).first()
+                # Calculate deductible remaining
+                deductible_remaining = 3000.0 # Default
+                if accumulator:
+                    deductible_remaining = max(0, accumulator.deductible_limit - accumulator.deductible_met)
+                
+                # Check viability
                 viability = routing_engine.calculate_financial_viability(member, row["cpt_code"], matches)
                 viable_for_zero = viability["viable_for_zero"]
+                
+                # Proactive Rules Logic
 
                 # Determine if we should engage based on NEW Decision Tree
                 # We engage if:
@@ -185,11 +196,32 @@ class TPAIngestionService:
                     
                     # SMS Decision Tree Implementation
                     from app.services.twilio_service import TwilioService
+                    from app.services.cpt_service import CPTService
+                    from app.services.referral_image_service import ReferralImageService
+                    
+                    cpt_service = CPTService()
+                    image_service = ReferralImageService()
                     
                     # Get member's plan name
                     plan_name = member.plan.name if member.plan else "your health plan"
                     member_name = member.first_name
-                    service_name = row["cpt_code"]  # Could map to friendly names like "blood work"
+                    
+                    # Get friendly service name
+                    service_name = cpt_service.get_description(row["cpt_code"])
+                    
+                    # Generate custom referral image
+                    # We need provider name, let's assume "Dr. Smith" or lookup if we had provider table
+                    provider_name = "Dr. John Smith" 
+                    media_url = image_service.generate_generic_referral(
+                        member_name=f"{member.first_name} {member.last_name}",
+                        provider_name=provider_name,
+                        test_name=service_name
+                    )
+                    
+                    # Full URL for Twilio (needs to be reachable, but for demo localhost is fine if we just want to log it)
+                    # Ideally we'd use ngrok, but for local demo console display, relative path or localhost is fine.
+                    # Twilio won't actually fetch it if it's localhost, but our demo console will display it.
+                    full_media_url = f"http://localhost:8000{media_url}"
                     
                     # DECISION TREE: TPA Referral (Proactive)
                     # Rules:
@@ -201,49 +233,60 @@ class TPAIngestionService:
                     msg = None
                     
                     if member.opted_in:
-                        # Path 1.3: Opted-in + Viable
+                        # Path 1.3: Opted-in + Viable ($0)
                         if matches:
                             site_name = matches[0]['name']
                             msg = (
                                 f"Hi {member_name}, your doctor ordered {service_name}. "
-                                f"You can get this with **no out of pocket cost** at {site_name}. "
-                                f"Tap to view directions and schedule."
+                                f"You can get this with no out of pocket cost at {site_name}."
                             )
                         else:
                             # Should not happen if viable_for_zero is true, but fallback
                             msg = None
                             
                     else:
-                        # Path 1.1: Not Opted-in + Viable
+                        # Path 1.1: Not Opted-in + Viable ($0)
                         msg = (
                             f"Hi {member_name}, {plan_name} works with Totl to help you get certain tests "
-                            f"with **no out of pocket cost**. You have a new referral. "
+                            f"with no out of pocket cost. You have a new referral. "
                             f"Reply YES to see your $0 options."
                         )
                     
                     # Send SMS and log if message was generated
                     if msg:
-                        twilio = TwilioService()
-                        # Use local URL for demo simulation
-                        media_url = "http://127.0.0.1:8000/static/images/referral_generic.png"
-                        sid = twilio.send_sms(member.phone_number, msg, media_url=media_url)
+                        # Normalize phone number for check
+                        from app.core.utils import normalize_phone_number
+                        normalized_phone = normalize_phone_number(member.phone_number)
                         
-                        # Log Interaction
-                        self.session.add(MemberInteraction(
-                            member_id=member.id,
-                            message_type="outbound_referral_trigger",
-                            content=msg + f" [Image: {media_url}]"
-                        ))
+                        # Explicitly check OptOut here to be safe
+                        from app.db.models import OptOut
+                        opt_out_check = self.session.exec(select(OptOut).where(OptOut.phone_number == normalized_phone)).first()
+                        
+                        if opt_out_check:
+                            # Log blocked SMS
+                            # print(f"BLOCKED proactive SMS to {normalized_phone} due to OptOut record.", flush=True)
+                            sid = None
+                        else:
+                            twilio = TwilioService()
+                            sid = twilio.send_sms(member.phone_number, msg, media_url=full_media_url, session=self.session)
+                        
+                        # Log Interaction only if sent
+                        if sid:
+                            self.session.add(MemberInteraction(
+                                member_id=member.id,
+                                message_type="outbound_referral_trigger",
+                                content=msg + f" [Image: {full_media_url}]"
+                            ))
                     else:
                         # Should not happen given should_engage logic, but safe fallback
                         pass
                 else:
                     referral.status = "suppressed"
-                    # Log suppression for debugging
+                    # Log Interaction (Suppressed)
                     self.session.add(MemberInteraction(
                         member_id=member.id,
-                        message_type="suppressed_proactive",
-                        content=f"Referral {row['cpt_code']} suppressed: not viable"
+                        message_type="suppressed",
+                        content=f"Referral {row['cpt_code']} suppressed (Non-Viable) - No SMS Sent"
                     ))
                 
                 self.session.add(referral)

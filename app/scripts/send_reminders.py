@@ -88,7 +88,7 @@ def send_reminders():
             # Send Reminder
             msg = "Reminder from Totl: if your doctor orders labs or imaging at your upcoming physical, text us a photo first and we’ll show you the nearest $0 options."
             logger.info(f"Sending reminder to {member.phone_number}")
-            twilio.send_sms(member.phone_number, msg)
+            twilio.send_sms(member.phone_number, msg, session=session)
             
             processed_members.add(member.member_id)
             

@@ -96,7 +96,7 @@
                             {% for interaction in interactions %}
                             <tr>
                                 <td style="color: var(--gray-600); font-size: 13px;">{{
-                                    interaction.timestamp.strftime('%m/%d %H:%M') }}</td>
+                                    interaction.timestamp | to_cst | strftime('%m/%d %H:%M') }}</td>
                                 <td>
                                     <a href="/admin/members/{{ interaction.member_id }}"
                                         style="text-decoration: none; color: var(--gray-900); font-weight: 500;">

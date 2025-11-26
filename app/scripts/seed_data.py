@@ -5,6 +5,10 @@ from datetime import date, datetime, timedelta
 import random
 
 def seed_data():
+    # Create tables
+    from sqlmodel import SQLModel
+    SQLModel.metadata.create_all(engine)
+    
     with Session(engine) as session:
         print("Seeding data...")
         
@@ -266,6 +270,59 @@ def seed_data():
             session.add(EOB(
                 member_id_ref="HISTORICAL",
                 plan_id=acme_plan.id,
+                date_of_service=date(2023, 1, 1),
+                cpt_code="80050",
+                npi="3333333333",
+                allowed_amount=30.00,
+                facility_name="LabCorp Express"
+            ))
+            
+        # EOBs for TechStart Plan (Jane's Plan)
+        # EOB 5: General Hospital - Expensive MRI
+        eob5 = session.exec(select(EOB).where(EOB.plan_id == techstart_plan.id, EOB.npi == "1111111111", EOB.cpt_code == "73721")).first()
+        if not eob5:
+            session.add(EOB(
+                member_id_ref="HISTORICAL",
+                plan_id=techstart_plan.id,
+                date_of_service=date(2023, 1, 1),
+                cpt_code="73721",
+                npi="1111111111",
+                allowed_amount=2500.00,
+                facility_name="General Hospital Imaging"
+            ))
+
+        # EOB 6: QuickLab - Cheap MRI
+        eob6 = session.exec(select(EOB).where(EOB.plan_id == techstart_plan.id, EOB.npi == "2222222222", EOB.cpt_code == "73721")).first()
+        if not eob6:
+            session.add(EOB(
+                member_id_ref="HISTORICAL",
+                plan_id=techstart_plan.id,
+                date_of_service=date(2023, 1, 1),
+                cpt_code="73721",
+                npi="2222222222",
+                allowed_amount=450.00,
+                facility_name="QuickLab Freestanding Center"
+            ))
+            
+        # EOB 7: General Hospital - Expensive Labs (80050)
+        eob7 = session.exec(select(EOB).where(EOB.plan_id == techstart_plan.id, EOB.npi == "1111111111", EOB.cpt_code == "80050")).first()
+        if not eob7:
+            session.add(EOB(
+                member_id_ref="HISTORICAL",
+                plan_id=techstart_plan.id,
+                date_of_service=date(2023, 1, 1),
+                cpt_code="80050",
+                npi="1111111111",
+                allowed_amount=300.00,
+                facility_name="General Hospital Labs"
+            ))
+            
+        # EOB 8: LabCorp - Cheap Labs (80050)
+        eob8 = session.exec(select(EOB).where(EOB.plan_id == techstart_plan.id, EOB.npi == "3333333333", EOB.cpt_code == "80050")).first()
+        if not eob8:
+            session.add(EOB(
+                member_id_ref="HISTORICAL",
+                plan_id=techstart_plan.id,
                 date_of_service=date(2023, 1, 1),
                 cpt_code="80050",
                 npi="3333333333",

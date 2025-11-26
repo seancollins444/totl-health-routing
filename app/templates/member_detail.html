@@ -109,7 +109,12 @@
                                 style="max-width: 75%;">
                                 <div class="card-body p-2">
                                     {% if msg.content %}
+                                    {% if msg.content.startswith('Photo: ') %}
+                                    <img src="{{ msg.content.replace('Photo: ', '') }}" class="img-fluid rounded mb-2"
+                                        style="max-height: 200px;">
+                                    {% else %}
                                     <p class="mb-1">{{ msg.content }}</p>
+                                    {% endif %}
                                     {% elif msg.inbound_content_summary %}
                                     <p class="mb-1"><em>{{ msg.inbound_content_summary }}</em></p>
                                     {% endif %}
@@ -123,7 +128,7 @@
                                     <small
                                         class="{% if 'inbound' in msg.message_type %}text-muted{% else %}text-white-50{% endif %}"
                                         style="font-size: 0.7rem;">
-                                        {{ msg.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                                        {{ msg.timestamp | to_cst | strftime('%Y-%m-%d %H:%M') }}
                                     </small>
                                 </div>
                             </div>

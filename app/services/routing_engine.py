@@ -108,23 +108,49 @@ class RoutingEngine:
         if deductible_remaining == 0:
             # Deductible met - check if cheapest option is low enough for $0 OOP
             if matches and len(matches) > 0:
-                cheapest_price = matches[0].get('price', 999999)
+                cheapest_match = matches[0]
+                cheapest_price = cheapest_match.get('price', 999999)
                 
-                # Simplified logic: if price is very low (< $100), likely $0 after insurance
-                # In production, this would use actual coinsurance rates
-                if cheapest_price < 100:
-                    return {
+                # REALISTIC LOGIC:
+                # 1. Imaging (7xxxx) at Freestanding Centers is covered 100% ($0 OOP)
+                # 2. Labs (8xxxx) are subject to 20% coinsurance even at preferred labs
+                
+                is_imaging = cpt_code.startswith("7")
+                is_freestanding = "Freestanding" in cheapest_match.get('name', '') or "LabCorp" in cheapest_match.get('name', '') or "Quest" in cheapest_match.get('name', '')
+                # Note: In a real app, we'd check the Facility.facility_type from the DB, but matches dict might not have it.
+                # Let's assume matches has it or infer from name for MVP.
+                # Actually, PricingService returns 'name', 'address', 'price'.
+                # Let's infer from name for the demo or update PricingService.
+                # QuickLab is Freestanding. LabCorp is Freestanding.
+                
+                if is_imaging and (cheapest_price < 1000): # Assuming < $1000 implies Freestanding vs Hospital ($2500)
+                     return {
                         "viable_for_zero": True,
                         "estimated_oop": 0,
-                        "reasoning": "Deductible met, low-cost facility available"
+                        "reasoning": "Imaging at Freestanding Center ($0 OOP Benefit)"
                     }
+                elif not is_imaging:
+                    # Labs - 20% coinsurance
+                    estimated_coinsurance = cheapest_price * 0.20
+                    # Unless it's preventive? (Not handling yet)
+                    if estimated_coinsurance < 1.0: # If very cheap (<$5), maybe $0?
+                         return {
+                            "viable_for_zero": True,
+                            "estimated_oop": 0,
+                            "reasoning": "Low cost lab, effectively $0"
+                        }
+                    else:
+                        return {
+                            "viable_for_zero": False,
+                            "estimated_oop": estimated_coinsurance,
+                            "reasoning": f"Coinsurance applies (~${estimated_coinsurance:.2f})"
+                        }
                 else:
-                    # Member might pay coinsurance (e.g., 20%)
-                    estimated_coinsurance = cheapest_price * 0.2
+                    # Imaging at Hospital?
                     return {
                         "viable_for_zero": False,
-                        "estimated_oop": estimated_coinsurance,
-                        "reasoning": f"Deductible met but coinsurance applies (~${int(estimated_coinsurance)})"
+                        "estimated_oop": cheapest_price * 0.20,
+                        "reasoning": "Hospital Imaging (Coinsurance applies)"
                     }
             else:
                 return {
@@ -133,8 +159,7 @@ class RoutingEngine:
                     "reasoning": "No pricing data available"
                 }
         else:
-            # Deductible not met - member pays full cost until deductible is reached
-            # Not viable for $0 unless it's a preventive service (not implemented yet)
+            # Deductible not met
             if matches and len(matches) > 0:
                 cheapest_price = matches[0].get('price', 0)
                 estimated_oop = min(cheapest_price, deductible_remaining)

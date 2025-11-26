@@ -14,10 +14,45 @@ class TwilioService:
             logger.error(f"Twilio init failed: {e}")
             self.client = None
 
-    def send_sms(self, to_number: str, body: str, media_url: str = None):
+    def send_sms(self, to_number: str, body: str, media_url: str = None, session=None):
         if not self.client:
             logger.warning(f"Twilio client not initialized. Would send to {to_number}: {body}")
             return
+
+        from app.core.utils import normalize_phone_number
+        to_number = normalize_phone_number(to_number)
+
+        if not session:
+            logger.warning(f"TwilioService.send_sms called WITHOUT session. Opt-out check skipped! To: {to_number}")
+
+        # STRICT OPT-OUT CHECK
+        if session:
+            from app.db.models import OptOut, Eligibility
+            from sqlmodel import select
+            
+            print(f"DEBUG SMS: Checking opt-out for {to_number}", flush=True)
+            
+            # Check OptOut table (Explicit Stop)
+            opt_out = session.exec(select(OptOut).where(OptOut.phone_number == to_number)).first()
+            if opt_out:
+                print(f"DEBUG SMS: BLOCKED by OptOut table: {to_number}", flush=True)
+                logger.warning(f"BLOCKED SMS to {to_number} (Opted Out): {body}")
+                return None
+            else:
+                print(f"DEBUG SMS: Not found in OptOut table: {to_number}", flush=True)
+                
+            # Check Eligibility table (Status flag)
+            member = session.exec(select(Eligibility).where(Eligibility.phone_number == to_number)).first()
+            if member:
+                print(f"DEBUG SMS: Member found: {member.member_id}, opted_out={member.opted_out}", flush=True)
+                if member.opted_out:
+                    print(f"DEBUG SMS: BLOCKED by Member status: {to_number}", flush=True)
+                    logger.warning(f"BLOCKED SMS to {to_number} (Member Status Opt-Out): {body}")
+                    return None
+            else:
+                print(f"DEBUG SMS: Member not found in Eligibility: {to_number}", flush=True)
+        else:
+            print(f"DEBUG SMS: No session provided!", flush=True)
 
         # Check for simulation
         if self.is_simulated_number(to_number):
@@ -30,7 +65,12 @@ class TwilioService:
                 "to": to_number
             }
             if media_url:
-                msg_args["media_url"] = [media_url]
+                # Check for localhost/private URLs which Twilio can't reach
+                if "localhost" in media_url or "127.0.0.1" in media_url:
+                    logger.warning(f"Skipping media_url {media_url} as it is local. NOT appending to body.")
+                    # Do not append to body, just skip sending media
+                else:
+                    msg_args["media_url"] = [media_url]
                 
             message = self.client.messages.create(**msg_args)
             return message.sid
@@ -50,5 +90,15 @@ class TwilioService:
         return f"SIM-{to_number}-{hash(body)}"
 
     def is_simulated_number(self, phone_number: str) -> bool:
-        # Jane's number from seed data
-        return phone_number == "5551234567"
+        # Jane's number from seed data (handle both raw and normalized)
+        return phone_number in ["5551234567", "+15551234567"]
+
+    def create_response(self, message_body: str):
+        """
+        Creates a TwiML response with the given message body.
+        """
+        from twilio.twiml.messaging_response import MessagingResponse
+        resp = MessagingResponse()
+        if message_body:
+            resp.message(message_body)
+        return resp
