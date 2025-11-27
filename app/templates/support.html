@@ -61,6 +61,8 @@
                         </td>
                         <td>
                             {% if msg.status == 'pending' or msg.status == 'replied' %}
+                            <a href="/admin/members/{{ msg.member_id }}" class="btn btn-sm btn-outline-secondary">View
+                                Chat</a>
                             <button class="btn btn-sm btn-primary" data-bs-toggle="modal"
                                 data-bs-target="#replyModal{{ msg.id }}">
                                 {% if msg.status == 'replied' %}Edit Reply{% else %}Reply{% endif %}
@@ -70,6 +72,9 @@
                                 <button type="submit" class="btn btn-sm btn-success">Mark Resolved</button>
                             </form>
                             {% endif %}
+                            {% else %}
+                            <a href="/admin/members/{{ msg.member_id }}" class="btn btn-sm btn-outline-secondary">View
+                                Chat</a>
                             {% endif %}
                         </td>
                     </tr>

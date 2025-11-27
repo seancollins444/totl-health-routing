@@ -189,7 +189,9 @@ class TPAIngestionService:
                 # So actually, if NOT viable_for_zero, we NEVER send proactive SMS.
                 # So `engage` is effectively `viable_for_zero`.
                 
-                should_engage = viable_for_zero
+                # Relaxed Rule: Engage if viable for $0 OR if Routing Engine suggests it (e.g. savings available)
+                print(f"DEBUG TPA: viable_for_zero={viable_for_zero}, routing_engage={routing_result['engage']}, reason={routing_result['reason']}", flush=True)
+                should_engage = viable_for_zero or routing_result['engage']
                 
                 if should_engage:
                     referral.status = "engaged"

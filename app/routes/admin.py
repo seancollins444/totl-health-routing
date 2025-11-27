@@ -419,6 +419,48 @@ async def update_member(
 
     return RedirectResponse(url=f"/admin/members/{member_id}", status_code=303)
 
+@router.post("/members/{member_id}/send_message")
+async def send_message(
+    request: Request,
+    member_id: int,
+    message: str = Form(...),
+    session: Session = Depends(get_session)
+):
+    login_required(request)
+    from app.services.twilio_service import TwilioService
+    from app.db.models import Eligibility, MemberInteraction
+    
+    member = session.get(Eligibility, member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+        
+    # Send SMS via Twilio Service
+    twilio = TwilioService()
+    # Note: send_sms handles logging if sid is returned, but we might want to force log here 
+    # if send_sms fails or returns None (e.g. opt out).
+    # Actually, send_sms returns SID if sent.
+    
+    sid = twilio.send_sms(member.phone_number, message, session=session)
+    
+    if sid:
+        # Log interaction (outbound)
+        # TwilioService doesn't log outbound automatically? 
+        # Wait, in trigger_event we logged it manually.
+        # In twilio_webhook we logged it manually.
+        # So we should log it here.
+        session.add(MemberInteraction(
+            member_id=member.id,
+            message_type="outbound_sms",
+            content=message
+        ))
+        session.commit()
+    else:
+        # Failed or Opted Out
+        # We should probably notify the admin, but for now just redirect.
+        pass
+        
+    return RedirectResponse(url=f"/admin/members/{member_id}", status_code=303)
+
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, session: Session = Depends(get_session)):
     login_required(request)
@@ -451,6 +493,11 @@ async def trigger_demo_event(
         "cpt_code": cpt_code,
         "provider_npi": "1111111111"  # General Hospital (High Cost)
     }])
+    
+    if result["errors"]:
+        print(f"DEBUG ADMIN: Ingestion Errors: {result['errors']}", flush=True)
+    else:
+        print(f"DEBUG ADMIN: Ingestion Success: {result['processed']} processed", flush=True)
     
     # Redirect back to demo console with the member selected
     return RedirectResponse(url=f"/admin/demo/console?member_id={member.id}", status_code=303)
@@ -642,13 +689,14 @@ async def reset_demo(
         member = session.get(Eligibility, member_id)
         if member:
             print(f"DEBUG RESET: Resetting eligibility for {member.first_name}", flush=True)
-            if member.id in [1, 2]: # Sean, Jane
+            # Check by member_id string (MEM001=Sean, MEM002=Jane)
+            if member.member_id in ["MEM001", "MEM002"]: 
                 member.opted_in = True
                 member.opted_out = False
                 # Ensure phone is normalized
                 from app.core.utils import normalize_phone_number
                 member.phone_number = normalize_phone_number(member.phone_number)
-            else: # Bob
+            else: # Bob (MEM003) or others
                 member.opted_in = False
                 member.opted_out = True
             session.add(member)
@@ -801,8 +849,13 @@ async def upload_referrals(
             csv_reader = csv.DictReader(io.StringIO(content.decode()))
             data = list(csv_reader)
         
+        # Call TPA ingestion
         service = TPAIngestionService(session)
         result = service.ingest_referrals(data)
+        if result["errors"]:
+            print(f"DEBUG ADMIN: Ingestion Errors: {result['errors']}", flush=True)
+        else:
+            print(f"DEBUG ADMIN: Ingestion Success: {result['processed']} processed", flush=True)
         
         return templates.TemplateResponse("integrations.html", {
             "request": request,

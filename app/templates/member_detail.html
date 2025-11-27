@@ -139,8 +139,24 @@
                         {% endif %}
                     </div>
                 </div>
+                <div class="card-footer">
+                    <form action="/admin/members/{{ member.id }}/send_message" method="post" class="d-flex gap-2">
+                        <input type="text" name="message" class="form-control" placeholder="Type a message..." required>
+                        <button type="submit" class="btn btn-primary">Send</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    // Auto-scroll to bottom of chat history
+    document.addEventListener("DOMContentLoaded", function () {
+        var chatHistory = document.querySelector('.chat-history');
+        if (chatHistory) {
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+    });
+</script>
 {% endblock %}

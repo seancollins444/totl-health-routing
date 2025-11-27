@@ -238,4 +238,5 @@ async def twilio_webhook(
     # Auto-respond (Global Rule HELP/Default)
     resp_text = "Totl: Got your message. A support associate will text you within 24 hours."
     
+    session.commit()
     return str(twilio.create_response(resp_text))

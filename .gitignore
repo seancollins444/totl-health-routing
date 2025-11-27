@@ -57,3 +57,13 @@ htmlcov/
 
 # Pytest
 .pytest_cache/
+
+# Debug files
+*_debug.txt
+*_debug_top.txt
+webhook_debug.txt
+cookies.txt
+
+# Generated referral images
+app/static/referrals/generic_referral_*.png
+app/static/referrals/gh_referral_*.png
