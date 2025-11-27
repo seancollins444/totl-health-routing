@@ -71,7 +71,7 @@ class TwilioService:
                     # Do not append to body, just skip sending media
                 else:
                     msg_args["media_url"] = [media_url]
-                
+            
             message = self.client.messages.create(**msg_args)
             return message.sid
         except Exception as e:

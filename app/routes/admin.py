@@ -58,6 +58,14 @@ def login_required(request: Request):
     if get_current_user(request) is None:
         raise HTTPException(status_code=status.HTTP_307_TEMPORARY_REDIRECT, headers={"Location": "/admin/login"})
 
+def get_support_count(session: Session):
+    from app.db.models import SupportMessage
+    # Count pending or replied (active) messages
+    # Actually, usually badge is for "pending" (unanswered)
+    # Let's count "pending"
+    count = session.exec(select(func.count()).select_from(SupportMessage).where(SupportMessage.status == "pending")).one()
+    return count
+
 # --- Routes ---
 
 @router.get("/login", response_class=HTMLResponse)
@@ -126,7 +134,8 @@ async def dashboard(request: Request, employer_id: int = None, session: Session 
         "stats": stats,
         "interactions": interactions,
         "employers": employers,
-        "selected_employer_id": employer_id
+        "selected_employer_id": employer_id,
+        "support_count": get_support_count(session)
     })
 
 @router.post("/upload/eligibility")
@@ -272,7 +281,8 @@ async def members_list(
         "status": status,
         "employers": employers,
         "selected_employer_id": employer_id,
-        "error": error_message
+        "error": error_message,
+        "support_count": get_support_count(session)
     })
 
 @router.post("/members/{member_id}/unlock")
@@ -385,7 +395,8 @@ async def member_detail(request: Request, member_id: int, session: Session = Dep
         "member": member,
         "plans": plans,
         "interactions": interactions,
-        "accumulator": accumulator
+        "accumulator": accumulator,
+        "support_count": get_support_count(session)
     })
 
 @router.post("/members/{member_id}")
@@ -464,7 +475,7 @@ async def send_message(
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, session: Session = Depends(get_session)):
     login_required(request)
-    return templates.TemplateResponse("settings.html", {"request": request})
+    return templates.TemplateResponse("settings.html", {"request": request, "support_count": get_support_count(session)})
 
 
 @router.post("/demo/trigger_event")
@@ -522,11 +533,14 @@ async def demo_console(request: Request, member_id: int = None, session: Session
                 .order_by(MemberInteraction.timestamp.asc())
             ).all()
             
-    return templates.TemplateResponse("demo_console.html", {
+    count = 999 # Hardcoded debug
+    print(f"DEBUG ADMIN: demo_console support_count = {count}", flush=True)
+    return templates.TemplateResponse("demo_console_v2.html", {
         "request": request,
         "demo_users": demo_users,
         "selected_member": selected_member,
-        "interactions": interactions
+        "interactions": interactions,
+        "support_count": count
     })
 
 @router.post("/demo/simulate_inbound")
@@ -605,13 +619,13 @@ async def simulate_inbound(
                 provider_name="Dr. Jane Doe",
                 test_name="MRI Knee"
             )
-            full_url = f"http://localhost:8000{image_url}"
+            full_url = f"{settings.BASE_URL}{image_url}"
         except Exception as e:
             print(f"Failed to generate LabCorp referral: {e}")
             import traceback
             traceback.print_exc()
             # Fallback to a simple placeholder
-            full_url = "http://localhost:8000/static/placeholder.png"
+            full_url = f"{settings.BASE_URL}/static/placeholder.png"
         
         # Call the webhook with the generated image
         try:
@@ -729,7 +743,7 @@ async def reset_demo(
 @router.get("/integrations", response_class=HTMLResponse)
 async def integrations_page(request: Request, session: Session = Depends(get_session)):
     login_required(request)
-    return templates.TemplateResponse("integrations.html", {"request": request})
+    return templates.TemplateResponse("integrations.html", {"request": request, "support_count": get_support_count(session)})
 
 @router.post("/integrations/upload/eligibility", response_class=HTMLResponse)
 async def upload_eligibility(
@@ -943,7 +957,8 @@ async def support_queue(request: Request, filter: str = "active", session: Sessi
     return templates.TemplateResponse("support.html", {
         "request": request,
         "messages": messages,
-        "current_filter": filter
+        "current_filter": filter,
+        "support_count": get_support_count(session)
     })
 
 @router.post("/support/{message_id}/reply", response_class=HTMLResponse)

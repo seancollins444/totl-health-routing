@@ -220,10 +220,10 @@ class TPAIngestionService:
                         test_name=service_name
                     )
                     
-                    # Full URL for Twilio (needs to be reachable, but for demo localhost is fine if we just want to log it)
-                    # Ideally we'd use ngrok, but for local demo console display, relative path or localhost is fine.
-                    # Twilio won't actually fetch it if it's localhost, but our demo console will display it.
-                    full_media_url = f"http://localhost:8000{media_url}"
+                    # Full URL for Twilio (needs to be reachable)
+                    from app.core.config import get_settings
+                    settings = get_settings()
+                    full_media_url = f"{settings.BASE_URL}{media_url}"
                     
                     # DECISION TREE: TPA Referral (Proactive)
                     # Rules:

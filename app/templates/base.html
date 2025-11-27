@@ -191,6 +191,50 @@
             margin-top: 0.5rem;
             font-weight: 500;
         }
+
+        .nav-link-custom {
+            color: var(--gray-700);
+            font-weight: 500;
+            font-size: 14px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .nav-link-custom:hover {
+            background: rgba(0, 0, 0, 0.05);
+            color: var(--gray-900);
+        }
+
+        .nav-link-custom.active {
+            color: var(--primary-color);
+            background: rgba(0, 122, 255, 0.1);
+        }
+
+        .apple-badge {
+            background-color: #FF3B30;
+            /* Apple Red */
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 5px;
+            position: absolute;
+            top: -2px;
+            right: -6px;
+            box-shadow: 0 2px 4px rgba(255, 59, 48, 0.3);
+            border: 2px solid white;
+            /* Cutout effect */
+        }
     </style>
 </head>
 
@@ -202,9 +246,15 @@
             </a>
             <div class="d-flex gap-2">
                 {% if request.session.get("user_id") is not none %}
-                <a href="/admin/support" class="nav-btn btn-outline-warning">Support</a>
-                <a href="/admin/settings" class="nav-btn">Settings</a>
-                <a href="/admin/logout" class="nav-btn">Logout</a>
+                <a href="/admin/support" class="nav-link-custom" style="margin-right: 8px;">
+                    Support
+                    <!-- Debug: Count is {{ support_count }} -->
+                    {% if support_count and support_count > 0 %}
+                    <span class="apple-badge">{{ support_count }}</span>
+                    {% endif %}
+                </a>
+                <a href="/admin/settings" class="nav-link-custom">Settings</a>
+                <a href="/admin/logout" class="nav-link-custom" style="color: var(--danger-color);">Logout</a>
                 {% endif %}
             </div>
         </div>

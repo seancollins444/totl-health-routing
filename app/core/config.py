@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # Google Gemini
     GOOGLE_API_KEY: str = "dummy_google_key"
     GOOGLE_MAPS_API_KEY: str = "dummy_maps_key"
+    
+    # App
+    BASE_URL: str = "http://localhost:8000"
 
     model_config = SettingsConfigDict(env_file=".env", extra="allow", case_sensitive=True)
 

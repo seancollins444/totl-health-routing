@@ -1,3 +1,10 @@
+import sys
+if sys.version_info < (3, 10):
+    import importlib.metadata
+    import importlib_metadata
+    if not hasattr(importlib.metadata, "packages_distributions"):
+        importlib.metadata.packages_distributions = importlib_metadata.packages_distributions
+
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 from app.routes import twilio, admin, tpa, exceptions
